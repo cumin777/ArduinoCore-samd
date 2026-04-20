@@ -1,156 +1,154 @@
-# Seeed XIAO M0 Plus Test Guide
+# XIAO M0 Plus 测试指导
 
-## Scope
+## 1. 文档目标
 
-This document describes how to validate the newly added `Seeed XIAO M0 Plus (SAMD21)` support across:
+本文档用于指导你验证新增的 `Seeed XIAO M0 Plus (SAMD21)` 支持是否正确，覆盖两部分仓库：
 
 - `ArduinoCore-samd`
 - `uf2-samdx1`
 
-It separates validation into three levels:
+验证分为三层：
 
-1. Core-only validation: board menu, variant selection, compile, and basic upload behavior.
-2. Bootloader-source validation: confirm the new UF2 board definition builds and exposes the intended bootloader PID.
-3. End-to-end validation: confirm Arduino IDE can compile, reset into bootloader, detect the new bootloader PID, and upload successfully.
+1. `core` 层验证：板型是否出现、variant 是否正确、示例是否能编译、基础上传行为是否正常。
+2. `bootloader` 源码层验证：`uf2-samdx1` 中新增的 `XIAO_m0_plus` 是否能正常编译出 bootloader。
+3. 端到端验证：Arduino IDE 选择新板型后，是否能进入新 bootloader、识别新 PID，并成功上传。
 
-## Current Repository State
+## 2. 当前代码状态
 
-The current local changes are:
+当前本地代码已经完成这些修改：
 
-- Application/core PID: `0x803F`
-- Bootloader PID target: `0x003F`
-- Arduino board entry: `seeed_XIAO_m0_plus`
-- Arduino variant directory: `variants/XIAO_m0_plus`
-- UF2 board directory: `uf2-samdx1/boards/XIAO_m0_plus`
+- Arduino 应用态 PID：`0x803F`
+- Bootloader 目标 PID：`0x003F`
+- Arduino 新板型条目：`seeed_XIAO_m0_plus`
+- Arduino 新 variant：`variants/XIAO_m0_plus`
+- UF2 新板目录：`uf2-samdx1/boards/XIAO_m0_plus`
 
-Important:
+当前还要注意一件事：
 
-- The new board definition already exists in `boards.txt`.
-- The new variant already exists and contains the new I2S pin definitions.
-- The new UF2 board source already exists.
-- `boards.txt` still points `bootloader.file` to the existing `XIAO_m0` bootloader binary for now.
+- `boards.txt` 里的 `seeed_XIAO_m0_plus.bootloader.file` 目前仍然临时指向旧的 `XIAO_m0` bootloader 二进制。
 
-That means:
+这意味着：
 
-- You can validate board visibility and sketch compilation immediately.
-- You can validate the new bootloader source by building `uf2-samdx1`.
-- You cannot fully validate `Burn Bootloader` or the final bootloader binary selection in Arduino until the newly built bootloader artifact is copied back into `ArduinoCore-samd/bootloaders` and `bootloader.file` is updated to the new artifact path.
+1. 你现在就可以验证新板型是否出现、代码是否能编译、variant 是否生效。
+2. 你现在就可以验证 `uf2-samdx1` 里的新 bootloader 配置是否能构建。
+3. 但你现在还不能把 `Burn Bootloader` 的结果当成最终结论，因为 Arduino core 里还没有接入新编译出的 `XIAO_m0_plus` bootloader 产物。
 
-## Repositories
+## 3. 本地仓库路径
 
-- Core repo: `/home/seeed/workspace/seeeduino/ArduinoCore-samd`
-- Bootloader repo: `/home/seeed/workspace/seeeduino/uf2-samdx1`
+- Core 仓库：`/home/seeed/workspace/seeeduino/ArduinoCore-samd`
+- Bootloader 仓库：`/home/seeed/workspace/seeeduino/uf2-samdx1`
 
-## What Does Not Require a Push
+## 4. 是否需要先推送远端
 
-You do not need to push to a remote repository before local testing.
+不需要。
 
-Arduino IDE does not read your remote repository. It reads a local board package from one of these places:
+本地测试时，Arduino IDE 不会读取你的远端仓库，只会读取本机安装的板包。也就是说：
 
-1. A locally installed custom hardware package under your sketchbook `hardware/` directory.
-2. A Boards Manager installed package under your local Arduino package cache.
+1. 你不需要先 push。
+2. 你不需要先合并到线上主仓库。
+3. 你只需要让 Arduino IDE 读到你本地修改后的 `ArduinoCore-samd` 即可开始测试。
 
-For local validation, the recommended method is to expose your modified `ArduinoCore-samd` as a local custom hardware package.
+正式给别人使用时，才需要后续把修改推送到对应仓库，并更新 Boards Manager 发布包。
 
-## Prerequisites
+## 5. 测试环境准备
 
-### Hardware
+### 5.1 硬件
 
-- One `XIAO SAMD21 Plus` board
-- USB cable
-- Optional SWD/OpenOCD/J-Link setup if you want to flash bootloader directly
-- Optional I2S peripheral or logic analyzer if you want runtime I2S validation
+- 一块 `XIAO SAMD21 Plus`
+- USB 数据线
+- 如果要直刷 bootloader，准备 SWD / OpenOCD / J-Link
+- 如果要验证 I2S 运行时功能，准备 I2S 外设或逻辑分析仪
 
-### Software
+### 5.2 软件
 
-- Arduino IDE 2.x or Arduino CLI
+- Arduino IDE 2.x 或 Arduino CLI
 - `git`
 - `make`
 - `node`
-- `arm-none-eabi-gcc` for bootloader build
-- `python2` for UF2 conversion in `uf2-samdx1`
+- `arm-none-eabi-gcc`
+- `python2`
 
-Optional but useful on Linux:
+Linux 下建议额外安装：
 
 - `lsusb`
 - `udevadm`
-- `screen` or `minicom`
+- `screen` 或 `minicom`
 
-### Submodules
+### 5.3 初始化 bootloader 子模块
 
-If the bootloader repo has not initialized submodules yet:
+如果 `uf2-samdx1` 还没初始化子模块，先执行：
 
 ```bash
 cd /home/seeed/workspace/seeeduino/uf2-samdx1
 git submodule update --init --recursive
 ```
 
-## Test Plan Summary
+## 6. 推荐测试顺序
 
-Run the tests in this order:
+建议严格按下面顺序做：
 
-1. Install the modified `ArduinoCore-samd` locally into Arduino.
-2. Confirm `Seeed XIAO M0 Plus` appears in the board list.
-3. Compile smoke tests, including an I2S compile test.
-4. If the board already has a compatible bootloader, try a basic upload.
-5. Build the new bootloader from `uf2-samdx1`.
-6. Flash the new bootloader to the board.
-7. Verify bootloader PID `0x003F`.
-8. Copy the new bootloader artifact into `ArduinoCore-samd`, update `bootloader.file`, and rerun end-to-end upload tests.
+1. 先把本地 `ArduinoCore-samd` 接入 Arduino IDE。
+2. 确认新板型 `Seeed XIAO M0 Plus` 出现在 IDE 中。
+3. 先做编译验证，包括 Blink 和 I2S 编译。
+4. 如果板子上已经有兼容 bootloader，可以尝试一次基础上传。
+5. 编译 `uf2-samdx1` 里的新 bootloader。
+6. 把新 bootloader 烧进板子。
+7. 验证 bootloader 态 PID 是否为 `0x003F`。
+8. 把新 bootloader 产物回填到 `ArduinoCore-samd`，更新 `bootloader.file`。
+9. 再做最终端到端验证。
 
-## Part 1: Install the Modified Core Locally
+## 7. 将本地 ArduinoCore-samd 接入 Arduino IDE
 
-### Recommended Method: Sketchbook Hardware Symlink
+### 7.1 推荐方法：通过 sketchbook 的 hardware 目录软链接
 
-On Linux, create a local hardware package link:
+Linux 下建议这样做：
 
 ```bash
 mkdir -p ~/Arduino/hardware/Seeeduino
 ln -sfn /home/seeed/workspace/seeeduino/ArduinoCore-samd ~/Arduino/hardware/Seeeduino/samd
 ```
 
-Then restart Arduino IDE.
+然后彻底重启 Arduino IDE。
 
-Expected result:
+这样做的好处：
 
-- Arduino IDE should load this local core instead of requiring a packaged Boards Manager release.
+1. IDE 会直接读取你当前工作区里的代码。
+2. 你每次修改后不用手工复制整个 core。
+3. 最适合板卡开发阶段联调。
 
-### Alternative Method: Replace an Installed Package
+### 7.2 另一种方法：替换本地已安装板包
 
-If you prefer, you can overwrite the locally installed package under the Arduino package directory, but the symlink method is safer for development because it keeps the repo live.
+也可以直接覆盖 Arduino 本地安装的 Seeed `samd` 板包目录，但这个方式更容易污染现有环境，不如软链接适合开发。
 
-## Part 2: Confirm the New Board Appears
+## 8. 验证新板型是否出现
 
-Open Arduino IDE and check:
+打开 Arduino IDE，检查：
 
 1. `Tools -> Board`
-2. Search for `XIAO M0 Plus`
+2. 搜索 `XIAO M0 Plus`
 
-Expected result:
+预期结果：
 
-- `Seeed XIAO M0 Plus` appears as a selectable board.
+- 可以看到 `Seeed XIAO M0 Plus`
 
-If it does not appear:
+如果看不到：
 
-- Confirm the symlink target is correct.
-- Restart Arduino IDE completely.
-- Confirm the board entry exists in `boards.txt`.
+1. 检查软链接路径是否正确。
+2. 检查 `~/Arduino/hardware/Seeeduino/samd` 是否真的指向当前仓库。
+3. 完整退出 Arduino IDE 后重新打开。
+4. 再确认 `boards.txt` 中确实存在 `seeed_XIAO_m0_plus`。
 
-Relevant file:
+## 9. Core 层编译验证
 
-- `/home/seeed/workspace/seeeduino/ArduinoCore-samd/boards.txt`
+这一阶段不依赖新 bootloader 二进制，可以先做。
 
-## Part 3: Core-Only Compile Validation
+### 9.1 Blink 编译测试
 
-This phase does not require a newly built bootloader.
-
-### 3.1 Blink Compile Test
-
-Select:
+在 Arduino IDE 中选择：
 
 - Board: `Seeed XIAO M0 Plus`
 
-Compile a basic Blink sketch:
+编译下面的 Blink：
 
 ```cpp
 void setup() {
@@ -165,19 +163,19 @@ void loop() {
 }
 ```
 
-Expected result:
+预期结果：
 
-- Compilation succeeds.
+- 编译通过
 
-This validates:
+这一步主要验证：
 
-- `boards.txt` entry is usable
-- `build.variant=XIAO_m0_plus` resolves correctly
-- linker script and core selection are valid
+1. `boards.txt` 新板型条目可用。
+2. `build.variant=XIAO_m0_plus` 生效。
+3. 链接脚本和 core 选择正确。
 
-### 3.2 I2S Compile Test
+### 9.2 I2S 编译测试
 
-Compile this sketch:
+编译下面的测试代码：
 
 ```cpp
 #include <I2S.h>
@@ -197,320 +195,343 @@ void loop() {
 }
 ```
 
-Expected result:
+预期结果：
 
-- Compilation succeeds.
+- 编译通过
 
-This validates the new variant I2S definitions are visible to the core.
+这一步主要验证：
 
-Relevant file:
+1. `variants/XIAO_m0_plus/variant.h` 中新增的 I2S 宏已被正确使用。
+2. 新 variant 没有破坏原有 core 编译流程。
 
-- `/home/seeed/workspace/seeeduino/ArduinoCore-samd/variants/XIAO_m0_plus/variant.h`
+### 9.3 I2S 运行时验证，可选
 
-### 3.3 Optional Runtime I2S Pin Check
+如果你手头有 I2S 外设或逻辑分析仪，可以继续做运行时验证。
 
-If you have hardware attached, verify the new pin mapping:
+当前 pin 定义是：
 
 - `PIN_I2S_SD = PIN_A8`
 - `PIN_I2S_SCK = D2`
 - `PIN_I2S_FS = D3`
 
-Runtime validation options:
+建议验证方式：
 
-1. Connect to a compatible I2S device and verify audio transfer.
-2. Use a logic analyzer to check activity on D2 and D3 after `I2S.begin()`.
+1. 连接兼容的 I2S 外设，验证数据传输。
+2. 或者使用逻辑分析仪，在 `I2S.begin()` 后观察 D2、D3 是否有时钟/帧同步活动。
 
-## Part 4: USB PID Validation in Application Mode
+## 10. 应用态 USB PID 验证
 
-This phase validates the application-side USB PID from the core.
+这一阶段验证的是应用态 PID，也就是 Arduino 程序跑起来后的 USB 身份。
 
-Expected application PID:
+目标值：
 
 - `VID:PID = 2886:803F`
 
-On Linux, connect the board in normal application mode and run:
+在 Linux 下，可以运行：
 
 ```bash
 lsusb -d 2886:
 ```
 
-Or watch for reconnect events:
+或者持续观察：
 
 ```bash
 watch -n 0.5 'lsusb -d 2886:'
 ```
 
-Expected result:
+预期结果：
 
-- When the user application is running, the board enumerates as `2886:803f`.
+- 板子运行用户程序时，枚举为 `2886:803f`
 
-Notes:
+说明：
 
-- This result depends on the firmware built from the new board definition being flashed successfully.
-- If the board still runs old firmware or old descriptors, you may still see the old PID.
+1. 这一步要求你已经把基于新板型编译的固件成功烧录进板子。
+2. 如果板子里还是旧固件，可能还会看到旧 PID。
 
-## Part 5: Basic Upload Test Before New Bootloader Integration
+## 11. 在未接入新 bootloader 产物前的上传冒烟测试
 
-This is only a partial test.
+这一步只是冒烟测试，不是最终结论。
 
-Because `boards.txt` currently still points to the existing `XIAO_m0` bootloader binary, you should treat this step as a smoke test, not final signoff.
+原因是：
 
-Try uploading Blink from Arduino IDE.
+- 当前 `boards.txt` 仍然临时引用旧的 `XIAO_m0` bootloader 二进制。
 
-Expected possibilities:
+你可以尝试在 Arduino IDE 中上传 Blink。
 
-1. Upload succeeds if the existing board bootloader behavior is compatible enough.
-2. Upload fails when Arduino expects the new bootloader PID flow but the board still exposes the old bootloader PID.
+可能出现两种结果：
 
-If upload fails here, that does not automatically mean the core changes are wrong. It usually means the new bootloader binary has not yet been built, flashed, and integrated.
+1. 上传成功：说明当前 bootloader 行为和现有上传流程仍兼容。
+2. 上传失败：很可能不是 core 写错，而是新 bootloader 还没有真正编译、烧录并接回 Arduino core。
 
-## Part 6: Build the New Bootloader
+所以这一阶段：
 
-### 6.1 Build Command
+- 成功是加分项
+- 失败不能直接判定代码方案错误
+
+## 12. 编译新的 bootloader
+
+### 12.1 编译命令
+
+执行：
 
 ```bash
 cd /home/seeed/workspace/seeeduino/uf2-samdx1
 make BOARD=XIAO_m0_plus
 ```
 
-What this does:
+这条命令会：
 
-- Includes `boards/XIAO_m0_plus/board.mk`
-- Includes `boards/XIAO_m0_plus/board_config.h`
-- Builds a new bootloader binary, update UF2, and update INO
+1. 读取 `boards/XIAO_m0_plus/board.mk`
+2. 读取 `boards/XIAO_m0_plus/board_config.h`
+3. 生成新的 bootloader `.bin`
+4. 生成自更新 `.uf2`
+5. 生成自更新 `.ino`
 
-Relevant build logic:
-
-- `Makefile`
-- `boards/XIAO_m0_plus/board.mk`
-- `boards/XIAO_m0_plus/board_config.h`
-
-Expected output directory:
+输出目录预期为：
 
 - `/home/seeed/workspace/seeeduino/uf2-samdx1/build/XIAO_m0_plus/`
 
-Expected artifact patterns:
+输出文件名通常类似：
 
-- `bootloader-XIAO_m0_plus-<git-describe>.bin`
-- `update-bootloader-XIAO_m0_plus-<git-describe>.uf2`
-- `update-bootloader-XIAO_m0_plus-<git-describe>.ino`
+- `bootloader-XIAO_m0_plus-<git描述>.bin`
+- `update-bootloader-XIAO_m0_plus-<git描述>.uf2`
+- `update-bootloader-XIAO_m0_plus-<git描述>.ino`
 
-### 6.2 Build Pass Criteria
+### 12.2 编译通过标准
 
-The build passes if:
+满足以下几点即可判定通过：
 
-1. `make` completes without errors.
-2. The `.bin` artifact is generated.
-3. The `.uf2` update file is generated.
-4. The `.ino` self-update sketch is generated.
+1. `make` 无报错结束
+2. `.bin` 成功生成
+3. `.uf2` 成功生成
+4. `.ino` 成功生成
 
-If build fails:
+如果失败，优先检查：
 
-- Check `arm-none-eabi-gcc` exists in `PATH`.
-- Check `python2` exists in `PATH`.
-- Check submodules are initialized.
+1. `arm-none-eabi-gcc` 是否在 `PATH`
+2. `python2` 是否在 `PATH`
+3. 子模块是否初始化
 
-## Part 7: Flash the New Bootloader
+## 13. 将新 bootloader 烧进板子
 
-There are two practical ways to test the new bootloader.
+有两种常用方式。
 
-### Option A: Flash the Update UF2
+### 13.1 方式 A：使用 update UF2 自更新
 
-Use this if the board already has a working UF2 bootloader and can mount as a mass-storage device.
+适用条件：
 
-Steps:
+- 板子当前已经有可用的 UF2 bootloader
+- 板子能以 U 盘方式挂载
 
-1. Enter the current bootloader mode.
-2. Copy `update-bootloader-XIAO_m0_plus-<git-describe>.uf2` to the mounted drive.
-3. Wait for reboot.
+步骤：
 
-Expected result:
+1. 让板子进入当前 bootloader 模式
+2. 把 `update-bootloader-XIAO_m0_plus-<git描述>.uf2` 拷进挂载出来的磁盘
+3. 等待板子自动重启
 
-- The board reboots with the new bootloader image.
+预期结果：
 
-### Option B: Flash by SWD/OpenOCD/J-Link
+- 板子重启后，运行的是新 bootloader
 
-Use this if:
+### 13.2 方式 B：使用 SWD / OpenOCD / J-Link 直刷
 
-- the board is blank
-- the old bootloader is unusable
-- the UF2 self-update path is not available
+适用条件：
 
-In that case, flash the generated `.bin` directly to bootloader region `0x00000000` using your normal SWD flow.
+- 板子是空片
+- 旧 bootloader 不可用
+- 或者不想走 UF2 自更新路径
 
-Pass criteria:
+步骤原则：
 
-- The new bootloader starts.
-- Double-tap reset enters bootloader mode.
+1. 使用你的正常 SWD 工具链
+2. 把生成出的 `.bin` 烧到 bootloader 起始地址 `0x00000000`
 
-## Part 8: Validate Bootloader PID
+通过标准：
 
-Expected bootloader PID:
+1. 板子可以正常进入 bootloader
+2. 双击 reset 后可以停留在 bootloader
+
+## 14. 验证 bootloader 态 PID
+
+新的 bootloader 目标 PID 为：
 
 - `VID:PID = 2886:003F`
 
-Enter bootloader mode and run:
+让板子进入 bootloader 模式后执行：
 
 ```bash
 lsusb -d 2886:
 ```
 
-Expected result:
+预期结果：
 
-- The board enumerates as `2886:003f`.
+- 可以看到 `2886:003f`
 
-If it still shows `002f`:
+如果仍然看到旧值 `002f`，通常说明：
 
-- The new bootloader was not flashed.
-- Or the flashed image was not built from `boards/XIAO_m0_plus`.
+1. 实际烧进去的还是旧 bootloader
+2. 或者你烧录的并不是 `XIAO_m0_plus` 对应产物
 
-## Part 9: Integrate the New Bootloader Back into ArduinoCore-samd
+## 15. 将新 bootloader 产物回填到 ArduinoCore-samd
 
-This is the missing step required for complete Arduino-side validation.
+这是完成最终 Arduino 验证前必须补上的一步。
 
-### 9.1 Copy the New Artifact into the Core Repo
+### 15.1 建议做法
 
-Recommended approach:
-
-1. Create a dedicated bootloader folder inside `ArduinoCore-samd/bootloaders`, for example:
+建议在 `ArduinoCore-samd/bootloaders` 下新增一个目录，例如：
 
 ```text
 ArduinoCore-samd/bootloaders/XIAOM0_PLUS/
 ```
 
-2. Copy the generated bootloader `.bin` into that folder.
+然后把新编译产物复制进去：
 
-3. Optionally also copy the `update-bootloader-*.uf2`, `.ino`, and `.bin` files for release packaging consistency.
+1. `bootloader-*.bin`
+2. 如有需要，也把 `update-bootloader-*.uf2`
+3. 如有需要，也把 `update-bootloader-*.ino`
+4. 如有需要，也把 `update-bootloader-*.bin`
 
-### 9.2 Update boards.txt
+### 15.2 更新 boards.txt
 
-Update `seeed_XIAO_m0_plus.bootloader.file` from the current temporary value to the new artifact path.
+把当前 `seeed_XIAO_m0_plus.bootloader.file` 从临时旧路径改成新路径。
 
-Example target form:
+目标格式示例：
 
 ```text
-seeed_XIAO_m0_plus.bootloader.file=XIAOM0_PLUS/bootloader-XIAO_m0_plus-<git-describe>.bin
+seeed_XIAO_m0_plus.bootloader.file=XIAOM0_PLUS/bootloader-XIAO_m0_plus-<git描述>.bin
 ```
 
-### 9.3 Why This Step Matters
+### 15.3 为什么这一步必须做
 
-Without this step:
+如果不做这一步：
 
-- `Burn Bootloader` in Arduino will not use the new `XIAO_m0_plus` bootloader artifact.
-- The source repo and package repo remain out of sync.
+1. Arduino IDE 的 `Burn Bootloader` 不会用到新 bootloader 文件。
+2. `ArduinoCore-samd` 和 `uf2-samdx1` 两边配置是脱节的。
+3. 你做不到完整的最终回归。
 
-With this step:
+做完这一步后：
 
-- Arduino-side bootloader operations become aligned with the new board definition.
+1. Arduino IDE 侧 bootloader 文件路径和源码产物一致
+2. `Burn Bootloader` 才有意义
+3. 最终发布包才完整
 
-## Part 10: End-to-End Final Validation
+## 16. 最终端到端验证
 
-After integrating the built bootloader back into `ArduinoCore-samd`, rerun the full flow.
+当新 bootloader 产物已经回填到 `ArduinoCore-samd` 后，再做完整验证。
 
-### 10.1 Final Upload Test
+### 16.1 最终上传测试
 
-1. Select `Seeed XIAO M0 Plus` in Arduino IDE.
-2. Upload Blink.
-3. Observe the port reset behavior.
-4. Confirm upload completes.
+步骤：
 
-Expected result:
+1. Arduino IDE 选择 `Seeed XIAO M0 Plus`
+2. 上传 Blink
+3. 观察端口切换
+4. 等待上传完成
 
-- Board enters bootloader mode
-- Host detects the bootloader port
-- Upload succeeds
-- Board reboots into application firmware
+预期结果：
 
-### 10.2 PID Transition Test
+1. 板子先进入 bootloader
+2. 主机识别到 bootloader 设备
+3. 上传成功
+4. 板子回到应用态运行
 
-Observe USB enumeration during upload.
+### 16.2 PID 切换验证
 
-Expected sequence:
+完整上传流程中，USB PID 应该按下面顺序变化：
 
-1. Normal firmware mode: `2886:803f`
-2. Bootloader mode during upload: `2886:003f`
-3. Return to normal firmware mode: `2886:803f`
+1. 应用态：`2886:803f`
+2. Bootloader 态：`2886:003f`
+3. 上传完成后回到应用态：`2886:803f`
 
-### 10.3 Burn Bootloader Test
+### 16.3 Burn Bootloader 验证
 
-If your hardware setup supports it:
+如果你的调试环境支持，在 Arduino IDE 中再验证：
 
-1. Use Arduino IDE `Tools -> Burn Bootloader`
-2. Confirm the configured bootloader file is the new `XIAO_m0_plus` binary
+1. `Tools -> Burn Bootloader`
 
-Expected result:
+预期结果：
 
-- Bootloader flashing succeeds
-- Board enumerates with bootloader PID `0x003F`
+1. 使用的是 `seeed_XIAO_m0_plus.bootloader.file` 指定的新 bootloader
+2. 烧录成功
+3. 板子进入 bootloader 时枚举为 `2886:003f`
 
-## Pass/Fail Checklist
+## 17. 通过标准清单
 
-### Core-Only Pass
+### 17.1 Core 层通过
 
-- `Seeed XIAO M0 Plus` appears in Arduino IDE
-- Blink compiles
-- I2S sketch compiles
-- Variant resolves correctly
+- IDE 中出现 `Seeed XIAO M0 Plus`
+- Blink 编译通过
+- I2S 示例编译通过
+- variant 正确生效
 
-### Bootloader-Source Pass
+### 17.2 Bootloader 源码层通过
 
-- `make BOARD=XIAO_m0_plus` succeeds
-- New bootloader artifacts are generated
-- Flashing the new bootloader succeeds
-- Board enumerates as `2886:003f` in bootloader mode
+- `make BOARD=XIAO_m0_plus` 成功
+- 生成新的 `.bin/.uf2/.ino`
+- 板子刷入后能进入 bootloader
+- bootloader 枚举为 `2886:003f`
 
-### End-to-End Pass
+### 17.3 最终端到端通过
 
-- Application mode enumerates as `2886:803f`
-- Arduino upload succeeds
-- PID transitions between `803f` and `003f` correctly
-- `Burn Bootloader` uses the new artifact path after integration
+- 应用态枚举为 `2886:803f`
+- 上传流程成功
+- 上传期间 PID 正确在 `803f` 和 `003f` 间切换
+- `Burn Bootloader` 使用的是新 bootloader 产物
 
-## Common Failure Modes
+## 18. 常见失败场景
 
-### Board Does Not Appear in Arduino IDE
+### 18.1 IDE 里看不到新板型
 
-- Local hardware symlink path is wrong
-- Arduino IDE was not restarted
-- The folder name under `hardware/Seeeduino/samd` is incorrect
+优先检查：
 
-### Bootloader Build Fails
+1. `~/Arduino/hardware/Seeeduino/samd` 是否链接正确
+2. Arduino IDE 是否完整重启
+3. `boards.txt` 是否已包含 `seeed_XIAO_m0_plus`
 
-- `arm-none-eabi-gcc` missing
-- `python2` missing
-- submodules not initialized
+### 18.2 Bootloader 编译失败
 
-### Upload Fails but Compile Succeeds
+优先检查：
 
-- Core side is correct, but bootloader side is not yet integrated
-- Board is still running an old bootloader PID
-- Host is waiting for a port that never appears
+1. `arm-none-eabi-gcc` 是否存在
+2. `python2` 是否存在
+3. 子模块是否已初始化
 
-### Bootloader PID Is Still Old
+### 18.3 编译能过，但上传失败
 
-- Wrong bootloader image flashed
-- Old bootloader remained on the device
-- Update UF2 was not actually applied
+通常意味着：
 
-## Suggested Signoff Order
+1. Core 层已经正确
+2. 但 bootloader 还没有真正换成新版本
+3. 或者 host 还在等旧/新 PID 之外的设备切换
 
-Use this signoff sequence:
+### 18.4 Bootloader PID 还是旧值
 
-1. Sign off core compile behavior.
-2. Sign off bootloader build output.
-3. Sign off bootloader flashing and bootloader PID.
-4. Sign off final Arduino upload behavior.
-5. Sign off `Burn Bootloader` only after the new artifact is copied back into `ArduinoCore-samd` and `bootloader.file` is updated.
+通常意味着：
 
-## Recommended Next Action
+1. 没有刷入新 bootloader
+2. 刷入的是错误产物
+3. 自更新 UF2 没有真正执行成功
 
-If you want the fastest practical validation path:
+## 19. 建议签核顺序
 
-1. Install the modified `ArduinoCore-samd` locally.
-2. Verify board menu and compile.
-3. Build `uf2-samdx1` for `XIAO_m0_plus`.
-4. Flash the new bootloader.
-5. Verify `2886:003f` in bootloader mode.
-6. Copy the new bootloader artifact into `ArduinoCore-samd`.
-7. Update `bootloader.file`.
-8. Do the final Arduino upload test.
+建议按这个顺序签核：
+
+1. 先签核 core 编译行为
+2. 再签核 bootloader 构建产物
+3. 再签核 bootloader 刷写和 bootloader PID
+4. 再签核最终上传链路
+5. 最后签核 `Burn Bootloader`
+
+## 20. 最快的实测路径
+
+如果你想最快跑通一次完整验证，建议这样做：
+
+1. 把本地 `ArduinoCore-samd` 通过软链接接入 Arduino IDE
+2. 确认 `Seeed XIAO M0 Plus` 出现
+3. 先编译 Blink 和 I2S 示例
+4. 在 `uf2-samdx1` 中执行 `make BOARD=XIAO_m0_plus`
+5. 将新 bootloader 烧进板子
+6. 用 `lsusb` 确认 bootloader 态为 `2886:003f`
+7. 把新 bootloader 产物复制回 `ArduinoCore-samd/bootloaders`
+8. 更新 `boards.txt` 中的 `bootloader.file`
+9. 最后在 Arduino IDE 中做一次完整上传验证
