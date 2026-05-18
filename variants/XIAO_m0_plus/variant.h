@@ -69,7 +69,8 @@
 #define LED_BUILTIN PIN_LED
 
 // RGB LED (WS2812B) on PA27
-#define PIN_LED_RGB (11u)
+#define PIN_LED_RGB  (11u)
+#define PIN_NEOPIXEL PIN_LED_RGB
 
 // User Button on PB22
 #define PIN_BUTTON   (28u)
